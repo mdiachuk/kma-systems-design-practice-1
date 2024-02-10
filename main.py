@@ -4,10 +4,12 @@ import json
 import requests
 from flask import Flask, jsonify, request
 
-# create your API token, and set it up in Postman collection as part of the Body section
 API_TOKEN = ""
-# you can get API keys for free here - https://api-ninjas.com/api/jokes
-RSA_KEY = ""
+
+VISUAL_CROSSING_WEATHER_API_KEY = ""
+
+VISUAL_CROSSING_WEATHER_API_BASE_URL = ("https://weather.visualcrossing.com/"
+                                        "VisualCrossingWebServices/rest/services/timeline/")
 
 app = Flask(__name__)
 
@@ -28,22 +30,74 @@ class InvalidUsage(Exception):
         return rv
 
 
-def generate_joke(exclude: str, limit: int = 1):
-    url_base_url = "https://api.api-ninjas.com"
-    limit = 1
-    url_api = "jokes"
-    url_api_version = "v1"
+def get_weather_forecast(location: str, payload: str, include: str):
+    url = (f"{VISUAL_CROSSING_WEATHER_API_BASE_URL}/{location}/{payload}?unitGroup=metric"
+           f"&key={VISUAL_CROSSING_WEATHER_API_KEY}&include={include}")
 
-    url = f"{url_base_url}/{url_api_version}/{url_api}?limit={limit}"
+    print(url)
 
-    headers = {"X-Api-Key": RSA_KEY}
-
-    response = requests.get(url, headers=headers)
+    response = requests.get(url)
 
     if response.status_code == requests.codes.ok:
         return json.loads(response.text)
     else:
         raise InvalidUsage(response.text, status_code=response.status_code)
+
+
+def map_hourly_weather_forecast(response: json):
+    result = []
+
+    for hour_forecast in response["days"][0]["hours"]:
+        result.append({
+            "time": hour_forecast["datetime"],
+            "conditions": hour_forecast["conditions"],
+            "temp_c": hour_forecast["temp"],
+            "feels_like_c": hour_forecast["feelslike"],
+            "wind_kph": hour_forecast["windspeed"],
+            "humidity": hour_forecast["humidity"],
+            "precipitation_mm": hour_forecast["precip"],
+            "pressure_mb": hour_forecast["pressure"],
+            "uv_index": hour_forecast["uvindex"],
+        })
+
+    return result
+
+
+def get_hourly_weather_forecast(location: str, date: str):
+    response = get_weather_forecast(location, date, "hours")
+
+    return map_hourly_weather_forecast(response)
+
+
+def map_daily_weather_forecast(response: json):
+    result = []
+
+    for day_forecast in response["days"]:
+        result.append({
+            "conditions": day_forecast["conditions"],
+            "description": day_forecast["description"],
+            "temp_c": day_forecast["temp"],
+            "feels_like_c": day_forecast["feelslike"],
+            "wind_kph": day_forecast["windspeed"],
+            "humidity": day_forecast["humidity"],
+            "precipitation_mm": day_forecast["precip"],
+            "pressure_mb": day_forecast["pressure"],
+            "uv_index": day_forecast["uvindex"]
+        })
+
+    return result
+
+
+def get_daily_weather_forecast(location: str, date: str):
+    response = get_weather_forecast(location, date, "days")
+
+    return map_daily_weather_forecast(response)[0]
+
+
+def get_next_10_days_weather(location: str):
+    response = get_weather_forecast(location, "next10days", "days")
+
+    return map_daily_weather_forecast(response)
 
 
 @app.errorhandler(InvalidUsage)
@@ -53,37 +107,87 @@ def handle_invalid_usage(error):
     return response
 
 
-@app.route("/")
-def home_page():
-    return "<p><h2>KMA L2: python Saas.</h2></p>"
-
-
-@app.route("/content/api/v1/integration/generate", methods=["POST"])
-def joke_endpoint():
-    start_dt = dt.datetime.now()
+@app.route("/api/v1/hourly", methods=["POST"])
+def hourly_weather_endpoint():
     json_data = request.get_json()
 
     if json_data.get("token") is None:
         raise InvalidUsage("token is required", status_code=400)
+    elif json_data.get("location") is None:
+        raise InvalidUsage("location is required", status_code=400)
+    elif json_data.get("date") is None:
+        raise InvalidUsage("date is required", status_code=400)
 
     token = json_data.get("token")
+    location = json_data.get("location")
+    date = json_data.get("date")
 
     if token != API_TOKEN:
         raise InvalidUsage("wrong API token", status_code=403)
 
-    exclude = ""
-    if json_data.get("exclude"):
-        exclude = json_data.get("exclude")
-
-    joke = generate_joke(exclude)
-
-    end_dt = dt.datetime.now()
+    hourly_weather = get_hourly_weather_forecast(location, date)
 
     result = {
-        "event_start_datetime": start_dt.isoformat(),
-        "event_finished_datetime": end_dt.isoformat(),
-        "event_duration": str(end_dt - start_dt),
-        "joke": joke,
+        "timestamp": dt.datetime.now().isoformat(),
+        "location": location,
+        "date": date,
+        "weather": hourly_weather
+    }
+
+    return result
+
+
+@app.route("/api/v1/daily", methods=["POST"])
+def daily_weather_endpoint():
+    json_data = request.get_json()
+
+    if json_data.get("token") is None:
+        raise InvalidUsage("token is required", status_code=400)
+    elif json_data.get("location") is None:
+        raise InvalidUsage("location is required", status_code=400)
+    elif json_data.get("date") is None:
+        raise InvalidUsage("date is required", status_code=400)
+
+    token = json_data.get("token")
+    location = json_data.get("location")
+    date = json_data.get("date")
+
+    if token != API_TOKEN:
+        raise InvalidUsage("wrong API token", status_code=403)
+
+    daily_weather = get_daily_weather_forecast(location, date)
+
+    result = {
+        "timestamp": dt.datetime.now().isoformat(),
+        "location": location,
+        "date": date,
+        "weather": daily_weather
+    }
+
+    return result
+
+
+@app.route("/api/v1/10-days", methods=["POST"])
+def next_10_days_weather_endpoint():
+    json_data = request.get_json()
+
+    if json_data.get("token") is None:
+        raise InvalidUsage("token is required", status_code=400)
+    elif json_data.get("location") is None:
+        raise InvalidUsage("location is required", status_code=400)
+
+    token = json_data.get("token")
+    location = json_data.get("location")
+
+    if token != API_TOKEN:
+        raise InvalidUsage("wrong API token", status_code=403)
+
+    daily_weather = get_next_10_days_weather(location)
+
+    result = {
+        "timestamp": dt.datetime.now().isoformat(),
+        "location": location,
+        "weather": daily_weather
     }
 
     return result
