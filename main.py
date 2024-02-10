@@ -76,6 +76,7 @@ def map_daily_weather_forecast(response: json):
 
     for day_forecast in response["days"]:
         result.append({
+            "date": day_forecast["datetime"],
             "conditions": day_forecast["conditions"],
             "description": day_forecast["description"],
             "temp_c": day_forecast["temp"],
