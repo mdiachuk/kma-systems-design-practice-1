@@ -1,7 +1,7 @@
 import datetime as dt
 import json
-
 import requests
+
 from flask import Flask, jsonify, request
 
 API_TOKEN = ""
@@ -10,6 +10,10 @@ VISUAL_CROSSING_WEATHER_API_KEY = ""
 
 VISUAL_CROSSING_WEATHER_API_BASE_URL = ("https://weather.visualcrossing.com/"
                                         "VisualCrossingWebServices/rest/services/timeline/")
+
+OPENAI_API_KEY = ""
+
+OPENAI_API_BASE_URL = "https://api.openai.com/v1/chat/completions"
 
 app = Flask(__name__)
 
@@ -33,8 +37,6 @@ class InvalidUsage(Exception):
 def get_weather_forecast(location: str, payload: str, include: str):
     url = (f"{VISUAL_CROSSING_WEATHER_API_BASE_URL}/{location}/{payload}?unitGroup=metric"
            f"&key={VISUAL_CROSSING_WEATHER_API_KEY}&include={include}")
-
-    print(url)
 
     response = requests.get(url)
 
@@ -100,6 +102,29 @@ def get_next_10_days_weather(location: str):
     return map_daily_weather_forecast(response)
 
 
+def get_clothes_suggestion(weather: json):
+    response = requests.post(
+        url=OPENAI_API_BASE_URL,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {OPENAI_API_KEY}"
+        },
+        json={
+            "model": "gpt-3.5-turbo",
+            "messages": [{
+                "role": "user",
+                "content": f"Suggest clothes suitable for this weather, listed as comma-separated items without any "
+                           f"additional information or explanations: {json.dumps(weather)}"
+            }]
+        }
+    )
+
+    if response.status_code == requests.codes.ok:
+        return json.loads(response.text)["choices"][0]["message"]["content"]
+    else:
+        raise InvalidUsage(response.text, status_code=response.status_code)
+
+
 @app.errorhandler(InvalidUsage)
 def handle_invalid_usage(error):
     response = jsonify(error.to_dict())
@@ -156,12 +181,14 @@ def daily_weather_endpoint():
         raise InvalidUsage("wrong API token", status_code=403)
 
     daily_weather = get_daily_weather_forecast(location, date)
+    suggested_clothes = get_clothes_suggestion(daily_weather)
 
     result = {
         "timestamp": dt.datetime.now().isoformat(),
         "location": location,
         "date": date,
-        "weather": daily_weather
+        "weather": daily_weather,
+        "suggested_clothes": suggested_clothes
     }
 
     return result
