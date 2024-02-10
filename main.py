@@ -142,10 +142,13 @@ def hourly_weather_endpoint():
         raise InvalidUsage("location is required", status_code=400)
     elif json_data.get("date") is None:
         raise InvalidUsage("date is required", status_code=400)
+    elif json_data.get("requester_name") is None:
+        raise InvalidUsage("requester_name is required", status_code=400)
 
     token = json_data.get("token")
     location = json_data.get("location")
     date = json_data.get("date")
+    requester_name = json_data.get("requester_name")
 
     if token != API_TOKEN:
         raise InvalidUsage("wrong API token", status_code=403)
@@ -156,6 +159,7 @@ def hourly_weather_endpoint():
         "timestamp": dt.datetime.now().isoformat(),
         "location": location,
         "date": date,
+        "requester_name": requester_name,
         "weather": hourly_weather
     }
 
@@ -172,10 +176,13 @@ def daily_weather_endpoint():
         raise InvalidUsage("location is required", status_code=400)
     elif json_data.get("date") is None:
         raise InvalidUsage("date is required", status_code=400)
+    elif json_data.get("requester_name") is None:
+        raise InvalidUsage("requester_name is required", status_code=400)
 
     token = json_data.get("token")
     location = json_data.get("location")
     date = json_data.get("date")
+    requester_name = json_data.get("requester_name")
 
     if token != API_TOKEN:
         raise InvalidUsage("wrong API token", status_code=403)
@@ -187,6 +194,7 @@ def daily_weather_endpoint():
         "timestamp": dt.datetime.now().isoformat(),
         "location": location,
         "date": date,
+        "requester_name": requester_name,
         "weather": daily_weather,
         "suggested_clothes": suggested_clothes
     }
@@ -202,9 +210,12 @@ def next_10_days_weather_endpoint():
         raise InvalidUsage("token is required", status_code=400)
     elif json_data.get("location") is None:
         raise InvalidUsage("location is required", status_code=400)
+    elif json_data.get("requester_name") is None:
+        raise InvalidUsage("requester_name is required", status_code=400)
 
     token = json_data.get("token")
     location = json_data.get("location")
+    requester_name = json_data.get("requester_name")
 
     if token != API_TOKEN:
         raise InvalidUsage("wrong API token", status_code=403)
@@ -214,6 +225,7 @@ def next_10_days_weather_endpoint():
     result = {
         "timestamp": dt.datetime.now().isoformat(),
         "location": location,
+        "requester_name": requester_name,
         "weather": daily_weather
     }
 
